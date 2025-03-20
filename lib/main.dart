@@ -196,6 +196,7 @@ class _MyHomePageState extends State<MyHomePage> {
     await flutterTts.setVolume(volume);
     await flutterTts.setSpeechRate(rate);
     await flutterTts.setPitch(pitch);
+    await flutterTts.setLanguage('es-ES');
 
     if (_newVoiceText != null) {
       if (_newVoiceText!.isNotEmpty) {
@@ -283,10 +284,10 @@ class _MyHomePageState extends State<MyHomePage> {
     '''
     );
     var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+    print(decodedResponse);
     String res = decodedResponse['message']['content'].split('</think>')[1].substring(2);
     _addAnswer(res);
     _newVoiceText = res;
-    changedLanguageDropDownItem("es_ES");
     _speak();
   }
 }
