@@ -43,15 +43,22 @@ class _MyHomePageState extends State<MyHomePage> {
   final _ai = const types.User(id: '82091008-a586-4a89-ae75-a22bf8d6f3ac');
   late Tts tts = Tts();
   
+  late TextEditingController _ip = TextEditingController();
+  late TextEditingController _model = TextEditingController();
+
   stt.SpeechToText _speechToText = stt.SpeechToText();
   bool speechEnabled = false;
+  String _responseContent = "";
   String _lastWords = '';
+  late var _streamDisplay;
 
   @override
   initState() {
     super.initState();
     tts.init();
     _initSpeech();
+    _ip.value = TextEditingValue(text: "10.0.2.2:11434");
+    _model.value = TextEditingValue(text: "deepseek-r1:7b");
   }
 
     void changedLanguageDropDownItem(String? selectedType) {
@@ -104,18 +111,50 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: Chat(
-          messages: _messages,
-          onSendPressed: _handleSendPressed,
-          user: _user,
+        body: Padding(
+          padding: const EdgeInsets.only(top: 12.0),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: 
+                    TextField(
+                      controller: _ip,
+                      decoration: 
+                        InputDecoration(
+                          border: OutlineInputBorder()
+                        ),
+                    )
+                  ),
+                  Expanded(
+                    child: 
+                      TextField(
+                        controller: _model,
+                        decoration: 
+                          InputDecoration(
+                            border: OutlineInputBorder()
+                          ),
+                      )
+                    ),
+                ],
+              ),
+              Expanded(
+                child: Chat(
+                  messages: _messages,
+                  onSendPressed: _handleSendPressed,
+                  user: _user,
+                ),
+              ),
+            ],
+          ),
         ),
-      floatingActionButton: FloatingActionButton(
-        onPressed:
-            // If not yet listening for speech start, otherwise stop
-            _speechToText.isNotListening ? _startListening : _stopListening,
-        tooltip: 'Listen',
-        child: Icon(_speechToText.isNotListening ? Icons.mic_off : Icons.mic),
-      )
+        floatingActionButton: FloatingActionButton(
+          onPressed:
+              // If not yet listening for speech start, otherwise stop
+              _speechToText.isNotListening ? _startListening : _stopListening,
+          tooltip: 'Listen',
+          child: Icon(_speechToText.isNotListening ? Icons.mic_off : Icons.mic),
+        )
   );
 
   void _addMessage(types.Message message) {
@@ -150,11 +189,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> makeRequest(String text) async {
     print("sending '${text}' as request...");
     print("receiving response");
-    var response = await http.post(Uri.http('10.0.2.2:11434','api/chat'), 
-    body: 
+    var request = http.Request("POST", Uri.http(_ip.value.text,'api/chat'));
+    request.body = 
     '''
       {
-        "model": "deepseek-r1:7b",
+        "model": "${_model.value.text}",
         "messages": [
           {
             "role": "system",
@@ -164,16 +203,28 @@ class _MyHomePageState extends State<MyHomePage> {
             "role": "user",
             "content": "$text"
           }
-        ],
-        "stream": false
+        ]
       }
-    '''
-    );
-    var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-    print(decodedResponse);
-    String res = decodedResponse['message']['content'].split('</think>')[1].substring(2);
-    _addAnswer(res);
-    tts.newVoiceText = res;
+    ''';
+    var response = await request.send();
+    _responseContent = "";
+    _addAnswer("Cargando...");
+    response.stream.listen(_streamedResponseListen, onDone: _streamedResponseOnDone);
+    //tts.newVoiceText = res;
+    //tts.run();
+  }
+
+  void _streamedResponseListen(List<int> stream) {
+    var json = jsonDecode(utf8.decode(stream)) as Map;
+    _responseContent += json['message']['content'];
+    print(_responseContent);
+  }
+
+  void _streamedResponseOnDone() {
+    _responseContent = _responseContent.split('</think>')[1].substring(2);
+    _addAnswer(_responseContent);
+    _messages.removeAt(1);
+    tts.newVoiceText = _responseContent;
     tts.run();
   }
 }
