@@ -50,14 +50,13 @@ class _MyHomePageState extends State<MyHomePage> {
   bool speechEnabled = false;
   String _responseContent = "";
   String _lastWords = '';
-  late var _streamDisplay;
 
   @override
   initState() {
     super.initState();
     tts.init();
     _initSpeech();
-    _ip.value = TextEditingValue(text: "10.0.2.2:11434");
+    _ip.value = TextEditingValue(text: "10.0.2.2:5000");
     _model.value = TextEditingValue(text: "deepseek-r1:7b");
   }
 
@@ -189,11 +188,20 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> makeRequest(String text) async {
     print("sending '${text}' as request...");
     print("receiving response");
-    var request = http.Request("POST", Uri.http(_ip.value.text,'api/chat'));
-    request.body = 
+
+    Map<String,String> headers = {
+      'Content-type' : 'application/json', 
+      'Accept': 'application/json',
+    };
+
+    _addAnswer("Cargando...");
+
+    var response = await http.post(Uri.http(_ip.text, 'api/chat'), 
+    headers: headers,
+    body: 
     '''
       {
-        "model": "${_model.value.text}",
+        "model": "${_model.text}",
         "messages": [
           {
             "role": "system",
@@ -203,15 +211,20 @@ class _MyHomePageState extends State<MyHomePage> {
             "role": "user",
             "content": "$text"
           }
-        ]
+        ],
+        "prompt": "$text",
+        "stream": false
       }
-    ''';
-    var response = await request.send();
-    _responseContent = "";
-    _addAnswer("Cargando...");
-    response.stream.listen(_streamedResponseListen, onDone: _streamedResponseOnDone);
-    //tts.newVoiceText = res;
-    //tts.run();
+    '''
+    );
+    print(response.body);
+    var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+    String res = decodedResponse['message']['content'].split('</think>')[1].substring(2);
+    _addAnswer(res);
+    _messages.removeAt(1);
+    tts.newVoiceText = res;
+    changedLanguageDropDownItem("es_ES");
+    tts.run();
   }
 
   void _streamedResponseListen(List<int> stream) {
