@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/chroma_db/0edf561a-d877-416a-b658-2ecfe038afb2
+/chroma_db
+/chroma_db
+/webserver/env
