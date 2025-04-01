@@ -1,13 +1,11 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_tts/flutter_tts.dart';
+import 'tts.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -32,8 +30,6 @@ class MyApp extends StatelessWidget {
       );
 }
 
-enum TtsState { playing, stopped, paused, continued }
-
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -45,108 +41,33 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<types.Message> _messages = [];
   final _user = const types.User(id: '82091008-a484-4a89-ae75-a22bf8d6f3ac');
   final _ai = const types.User(id: '82091008-a586-4a89-ae75-a22bf8d6f3ac');
-  late FlutterTts flutterTts;
-  String? language;
-  String? engine;
-  double volume = 0.5;
-  double pitch = 1.0;
-  double rate = 0.5;
-  bool isCurrentLanguageInstalled = false;
-
-  String? _newVoiceText;
-  int? _inputLength;
-
-  TtsState ttsState = TtsState.stopped;
-
-  bool get isPlaying => ttsState == TtsState.playing;
-  bool get isStopped => ttsState == TtsState.stopped;
-  bool get isPaused => ttsState == TtsState.paused;
-  bool get isContinued => ttsState == TtsState.continued;
-
-  bool get isIOS => !kIsWeb && Platform.isIOS;
-  bool get isAndroid => !kIsWeb && Platform.isAndroid;
-  bool get isWindows => !kIsWeb && Platform.isWindows;
-  bool get isWeb => kIsWeb;
-
+  late Tts tts = Tts();
   
   stt.SpeechToText _speechToText = stt.SpeechToText();
-  bool _speechEnabled = false;
+  bool speechEnabled = false;
   String _lastWords = '';
 
   @override
   initState() {
     super.initState();
-    initTts();
+    tts.init();
     _initSpeech();
-  }
-
-  dynamic initTts() {
-    flutterTts = FlutterTts();
-
-    _setAwaitOptions();
-
-    if (isAndroid) {
-      _getDefaultEngine();
-      _getDefaultVoice();
-    }
-
-    flutterTts.setStartHandler(() {
-      setState(() {
-        print("Playing");
-        ttsState = TtsState.playing;
-      });
-    });
-
-    flutterTts.setCompletionHandler(() {
-      setState(() {
-        print("Complete");
-        ttsState = TtsState.stopped;
-      });
-    });
-
-    flutterTts.setCancelHandler(() {
-      setState(() {
-        print("Cancel");
-        ttsState = TtsState.stopped;
-      });
-    });
-
-    flutterTts.setPauseHandler(() {
-      setState(() {
-        print("Paused");
-        ttsState = TtsState.paused;
-      });
-    });
-
-    flutterTts.setContinueHandler(() {
-      setState(() {
-        print("Continued");
-        ttsState = TtsState.continued;
-      });
-    });
-
-    flutterTts.setErrorHandler((msg) {
-      setState(() {
-        print("error: $msg");
-        ttsState = TtsState.stopped;
-      });
-    });
   }
 
     void changedLanguageDropDownItem(String? selectedType) {
     setState(() {
-      language = selectedType;
-      flutterTts.setLanguage(language!);
-      if (isAndroid) {
-        flutterTts
-            .isLanguageInstalled(language!)
-            .then((value) => isCurrentLanguageInstalled = (value as bool));
+      tts.language = selectedType;
+      tts.setLanguage(tts.language!);
+      if (tts.isAndroid) {
+        tts
+            .isLanguageInstalled(tts.language!)
+            .then((value) => tts.isCurrentLanguageInstalled = (value as bool));
       }
     });
   }
 
   void _initSpeech() async {
-    _speechEnabled = await _speechToText.initialize();
+    speechEnabled = await _speechToText.initialize();
     setState(() {});
   }
 
@@ -174,45 +95,10 @@ class _MyHomePageState extends State<MyHomePage> {
     makeRequest(_lastWords);
   }
 
-  Future<dynamic> _getLanguages() async => await flutterTts.getLanguages;
-
-  Future<dynamic> _getEngines() async => await flutterTts.getEngines;
-
-  Future<void> _getDefaultEngine() async {
-    var engine = await flutterTts.getDefaultEngine;
-    if (engine != null) {
-      print(engine);
-    }
-  }
-
-  Future<void> _getDefaultVoice() async {
-    var voice = await flutterTts.getDefaultVoice;
-    if (voice != null) {
-      print(voice);
-    }
-  }
-
-  Future<void> _speak() async {
-    await flutterTts.setVolume(volume);
-    await flutterTts.setSpeechRate(rate);
-    await flutterTts.setPitch(pitch);
-    await flutterTts.setLanguage('es-ES');
-
-    if (_newVoiceText != null) {
-      if (_newVoiceText!.isNotEmpty) {
-        await flutterTts.speak(_newVoiceText!);
-      }
-    }
-  }
-
-  Future<void> _setAwaitOptions() async {
-    await flutterTts.awaitSpeakCompletion(true);
-  }
-
   @override
   void dispose() {
     super.dispose();
-    flutterTts.stop();
+    tts.stop();
   }
 
 
@@ -264,11 +150,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> makeRequest(String text) async {
     print("sending '${text}' as request...");
     print("receiving response");
-    var response = await http.post(Uri.http('190.180.43.12:11434','api/chat'), 
+    var response = await http.post(Uri.http('10.0.2.2:11434','api/chat'), 
     body: 
     '''
       {
-        "model": "deepseek-r1:1.5b",
+        "model": "deepseek-r1:7b",
         "messages": [
           {
             "role": "system",
@@ -287,7 +173,7 @@ class _MyHomePageState extends State<MyHomePage> {
     print(decodedResponse);
     String res = decodedResponse['message']['content'].split('</think>')[1].substring(2);
     _addAnswer(res);
-    _newVoiceText = res;
-    _speak();
+    tts.newVoiceText = res;
+    tts.run();
   }
 }
