@@ -219,7 +219,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
     print(response.body);
     var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-    String res = decodedResponse['message']['content'].split('</think>')[1].substring(2);
+    String res = decodedResponse['message']['content'].split('</think>')[0].substring(2);
     _addAnswer(res);
     _messages.removeAt(1);
     tts.newVoiceText = res;

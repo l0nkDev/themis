@@ -5,8 +5,6 @@ app = Flask(__name__)
 
 genai = loader()
 
-genai.ingest(file_path = "codigos.txt")
-
 @app.route('/api/chat', methods=['POST'])
 def chat():
     print(request.json)
